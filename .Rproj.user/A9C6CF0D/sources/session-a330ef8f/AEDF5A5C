@@ -1,11 +1,11 @@
 {
     "id": "AEDF5A5C",
-    "path": null,
-    "project_path": null,
+    "path": "C:/DartmouthT1 Course/Foundation Data science/finalproj.1/finalproj.1sub1.Rmd",
+    "project_path": "finalproj.1sub1.Rmd",
     "type": "r_markdown",
     "hash": "1237911715",
     "contents": "",
-    "dirty": true,
+    "dirty": false,
     "created": 1792781200066.0,
     "source_on_save": false,
     "relative_order": 1,
@@ -18,11 +18,11 @@
         "last_setup_crc32": "a330ef8fbb338d19"
     },
     "folds": "",
-    "lastKnownWriteTime": 846332972528000,
-    "encoding": "",
+    "lastKnownWriteTime": 1792782657,
+    "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1792781346226,
+    "last_content_update": 1792782657293,
     "read_only": false,
     "read_only_alternatives": []
 }
