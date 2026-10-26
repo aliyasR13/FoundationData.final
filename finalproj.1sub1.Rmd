@@ -38,18 +38,84 @@ clean_covar <- covar %>%
     mat_asthma = factor(mat_asthma, levels = c("0", "1"),labels = c("Healthy", "Asthma")), batch_Microarray = factor(batch_Microarray)
   ) %>%
 
-## Gene: 
-  # Derive a categorical variable from a continuous one (maternal age)
+## Gene:TMEM176B
+  #Continuous covariate: VitD
+  #Categorical 1: age_group
+  #Categorical 2: preeclampsia
+  # Derive a categorical variable from a continuous one (Age-group aka maternal age)
   mutate(age_group = factor(
   ifelse(mat_age_yrs < 25, "<25",
          ifelse(mat_age_yrs < 30, "25-29", "30+")),
   levels = c("<25", "25-29", "30+")))
 
 #view(clean_covar)
-#linking probID to gene
+#connect probID to gene so that I can now specify my gene of interest
+## expression file has probe ID but no gene names, gene file pairs probe ID with gene name. Use left join to combine these two tables. The column names are different so have to tell r they are actually the same info. To make easier to read use relocate to move the new gene column next to probe id. Check to make sure every probe found a match
+
 expr_named <- expr %>%
   left_join(gene, by =c("ProbID" = "PROBEID")) %>%
   relocate(GENE, .after = ProbID)
 sum(is.na(expr_named$GENE)) 
+
+#assigning my gene of interest
+my_gene <- "TMEM176B"
+
+
+#I have my gene now I need to figure out where it is in the table. reshape table into two columns that I can merge on my covariates. Dont need the probID or gene columns. I also want my gene names to be rows so I have to pivot_longer.
+gene_long <- expr_named %>%
+  filter(GENE == my_gene) %>%
+  select(-ProbID, -GENE) %>%
+  pivot_longer(everything(), names_to = "geoID", values_to = "expression")
+
+#save pivot table to dat
+dat <- gene_long %>%
+  inner_join(clean_covar, by = "geoID")
+
+#Checking data to make sure nothing was lost and everything matches correctly. Count the rows in merged data, does sample Id in covariate file appear as a col name in expression file, does every sample col in expression file appear in covariate file ( except for first column), ask if expression values are missing, and count how many samples fall into each combination of preeclampsia status and age group
+
+nrow(dat)                                    
+all(clean_covar$geoID %in% names(expr))      
+all(names(expr)[-1] %in% clean_covar$geoID)  
+anyNA(dat$expression)                        
+table(dat$preg_preeclampsia, dat$age_group) 
+
+
+#Setting theme and colors
+theme_1 <- theme_classic(base_size = 14) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        legend.position = "right")
+
+pe_colors <- c("Normal" = "#A888B5", "Preeclampsia" = "#EC5353")
+
+#Histogram of gene expression
+p_hist <- ggplot(dat, aes(x = expression)) +
+  geom_histogram(bins = 20, fill = "#A888B5", color = "black") +
+  labs(title = paste(my_gene, "Expression Distribution"),
+       x = paste(my_gene, "Expression Level"),
+       y = "Number of samples") +
+  theme_1
+
+p_hist
+
+# scatter plot vitD vs expression
+p_scatter <- ggplot(dat, aes(x = mat_vitD, y = expression)) +
+  geom_point(alpha = 0.7, size = 2, color = "#A888B5") +
+  labs(title = paste(my_gene, "Expression vs. Maternal Vitamin D"),
+       x = "Maternal vitamin D (25-hydroxyvitamin D, ng/mL)",
+       y = paste(my_gene, "expression (log2 intensity)")) +
+  theme_1
+
+p_scatter
+
+# Boxplot preeclampsia vs age group
+p_box <- ggplot(dat, aes(x = age_group, y = expression, fill = preg_preeclampsia)) +
+  geom_boxplot() +
+  scale_fill_manual(values = pe_colors, name = "Pregnancy outcome") +
+  labs(title = paste(my_gene, "Expression by Age Group\n and Preeclampsia status"),
+       x = "Maternal age group (years)",
+       y = paste(my_gene, "Expression Level")) +
+  theme_1
+
+p_box
 
 ```
