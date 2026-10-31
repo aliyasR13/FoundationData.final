@@ -1,6 +1,8 @@
 ---
 title: "Final1sub.1"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 date: "2026-10-23"
 ---
 
@@ -20,12 +22,15 @@ gene <- read_csv("GSE85307_geneNames.csv")
 #view(covar)
 #view(expr)
 #view(gene)
-## first col of expr has empty name, covar: description with data, remove those and better label
 
-#expr first col rename to ProbID
+
+##first col of expr has empty name, covar: description with data, remove those 
+##and better label
+
+##expr first col rename to ProbID
 expr <- expr %>% rename(ProbID = 1)
 
-#Cleaning covar so that there is no description, col have right value type, 
+##Cleaning covar so that there is no description, col have right value type, 
 clean_covar <- covar %>%
   mutate(across(-c(subjectID, geoID), ~ str_remove(.x, "^.*?:\\s*"))) %>%
   mutate(
@@ -34,15 +39,17 @@ clean_covar <- covar %>%
     sampleCollection_gestAge_wks = as.numeric(sampleCollection_gestAge_wks),
     mat_BMI = as.numeric(mat_BMI),
     mat_vitD = as.numeric(mat_vitD),
-    preg_preeclampsia = factor(preg_preeclampsia, levels = c("Normal", "Preeclampsia")),
-    mat_asthma = factor(mat_asthma, levels = c("0", "1"),labels = c("Healthy", "Asthma")), batch_Microarray = factor(batch_Microarray)
+    preg_preeclampsia = factor(preg_preeclampsia, levels = c("Normal",
+                                                             "Preeclampsia")),
+    mat_asthma = factor(mat_asthma, levels = c("0", "1"),labels = c("Healthy",
+                        "Asthma")), batch_Microarray = factor(batch_Microarray)
   ) %>%
 
 ## Gene:TMEM176B
   #Continuous covariate: VitD
   #Categorical 1: age_group
   #Categorical 2: preeclampsia
-  # Derive a categorical variable from a continuous one (Age-group aka maternal age)
+  # Derive a categorical variable from a continuous one (Age-group/maternal age)
   mutate(age_group = factor(
   ifelse(mat_age_yrs < 25, "<25",
          ifelse(mat_age_yrs < 30, "25-29", "30+")),
@@ -50,7 +57,12 @@ clean_covar <- covar %>%
 
 #view(clean_covar)
 #connect probID to gene so that I can now specify my gene of interest
-## expression file has probe ID but no gene names, gene file pairs probe ID with gene name. Use left join to combine these two tables. The column names are different so have to tell r they are actually the same info. To make easier to read use relocate to move the new gene column next to probe id. Check to make sure every probe found a match
+
+## expression file has probe ID but no gene names, gene file pairs probe ID 
+##with gene name. Use left join to combine these two tables. The column names 
+##are different so have to tell r they are actually the same info. To make 
+##easier to read use relocate to move the new gene column next to probe id. 
+##Check to make sure every probe found a match
 
 expr_named <- expr %>%
   left_join(gene, by =c("ProbID" = "PROBEID")) %>%
@@ -61,7 +73,11 @@ sum(is.na(expr_named$GENE))
 my_gene <- "TMEM176B"
 
 
-#I have my gene now I need to figure out where it is in the table. reshape table into two columns that I can merge on my covariates. Dont need the probID or gene columns. I also want my gene names to be rows so I have to pivot_longer.
+##I have my gene now I need to figure out where it is in the table. reshape 
+##table into two columns that I can merge on my covariates. Dont need the 
+##probID or gene columns. I also want my gene names to be rows so I have to 
+##pivot_longer.
+
 gene_long <- expr_named %>%
   filter(GENE == my_gene) %>%
   select(-ProbID, -GENE) %>%
@@ -71,7 +87,13 @@ gene_long <- expr_named %>%
 dat <- gene_long %>%
   inner_join(clean_covar, by = "geoID")
 
-#Checking data to make sure nothing was lost and everything matches correctly. Count the rows in merged data, does sample Id in covariate file appear as a col name in expression file, does every sample col in expression file appear in covariate file ( except for first column), ask if expression values are missing, and count how many samples fall into each combination of preeclampsia status and age group
+## Checking data to make sure nothing was lost and everything matches correctly.
+
+## Count the rows in merged data, does sample Id in covariate file appear as a 
+## col name in expression file, does every sample col in expression file appear 
+## in covariate file (except for first column), ask if expression values are 
+## missing, and count how many samples fall into each combination of 
+## preeclampsia status and age group
 
 nrow(dat)                                    
 all(clean_covar$geoID %in% names(expr))      
@@ -87,6 +109,7 @@ theme_1 <- theme_classic(base_size = 14) +
 
 pe_colors <- c("Normal" = "#A888B5", "Preeclampsia" = "#EC5353")
 
+
 #Histogram of gene expression
 p_hist <- ggplot(dat, aes(x = expression)) +
   geom_histogram(bins = 20, fill = "#A888B5", color = "black") +
@@ -96,26 +119,80 @@ p_hist <- ggplot(dat, aes(x = expression)) +
   theme_1
 
 p_hist
+#saving plot as pdf for presentations
+ggsave("sub1_plots_hist1.pdf")
 
 # scatter plot vitD vs expression
 p_scatter <- ggplot(dat, aes(x = mat_vitD, y = expression)) +
   geom_point(alpha = 0.7, size = 2, color = "#A888B5") +
   labs(title = paste(my_gene, "Expression vs. Maternal Vitamin D"),
        x = "Maternal vitamin D (25-hydroxyvitamin D, ng/mL)",
-       y = paste(my_gene, "expression (log2 intensity)")) +
+       y = paste(my_gene, "Expression Level")) +
   theme_1
 
 p_scatter
-
+#saving plot as pdf for presentations
+ggsave("sub1_plots_scatter_1.pdf")
 # Boxplot preeclampsia vs age group
-p_box <- ggplot(dat, aes(x = age_group, y = expression, fill = preg_preeclampsia)) +
+p_box <- ggplot(dat, aes(x = age_group, y = expression,
+                         fill = preg_preeclampsia)) +
   geom_boxplot() +
   scale_fill_manual(values = pe_colors, name = "Pregnancy outcome") +
-  labs(title = paste(my_gene, "Expression by Age Group\n and Preeclampsia status"),
+  labs(title = paste(my_gene,
+                     "Expression by Age Group\n and Preeclampsia status"),
        x = "Maternal age group (years)",
        y = paste(my_gene, "Expression Level")) +
   theme_1
 
 p_box
+#saving plot as pdf for presentations
+ggsave("sub1_plots.pdf")
+
+# used material from other classes (Data wrangling and Biostat) and AI for debugging
+```
+
+```{r}
+#Start of submission2
+
+#need somewhere to store my genes
+my_genes <- c("TMEM176B", "UTS2", "CLIC2")
+
+#need a table with one row per sample and one column per gene.
+genes_wide <- expr_named %>%
+  filter(GENE %in% my_genes)%>%
+  select(-ProbID)%>%
+  pivot_longer(-GENE, names_to = "geoID", values_to = "expression") %>%
+  pivot_wider(names_from = GENE, values_from = expression)
+
+#each gene name becomes its own column,filled with the genes expression values. 
+dat_all <- genes_wide %>%
+  inner_join(clean_covar, by = "geoID")
+#check to make sure it includes genes
+nrow(dat_all)
+names(dat_all)
+
+#making function:
+# wants function to make histogram, scatter plot and boxplot for each gene.
+
+make_gene_plots <- function(df, genes) {
+
+  for (g in genes) {
+
+    # copy this gene's values into a column called "expression"
+    df$expression <- df[[g]]
+
+    # Histogram of expression
+    print(ggplot(df, aes(x = expression)) +
+      geom_histogram(bins = 20, fill = "#A888B5", color = "white") +
+      labs(title = paste(g, "Expression Distribution"),
+           x = paste(g, "Expression Level"),
+           y = "Number of samples"))
+    # Scatterplot: vitamin D vs expression
+    # Boxplot: age group and preeclampsia status
+    
+  }
+  
+}
+
 
 ```
