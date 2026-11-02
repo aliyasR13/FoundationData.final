@@ -164,15 +164,17 @@ genes_wide <- expr_named %>%
   pivot_longer(-GENE, names_to = "geoID", values_to = "expression") %>%
   pivot_wider(names_from = GENE, values_from = expression)
 
-#each gene name becomes its own column,filled with the genes expression values. 
+#each gene name becomes its own column,filled with the genes expression values.(merging genes_wide with vitD, age group etc.)
+
 dat_all <- genes_wide %>%
   inner_join(clean_covar, by = "geoID")
-#check to make sure it includes genes
-nrow(dat_all)
-names(dat_all)
+
+#check to make sure it includes genes (it is)
+##nrow(dat_all)
+##names(dat_all)
 
 #making function:
-# wants function to make histogram, scatter plot and boxplot for each gene.
+# wants function to make histogram, scatter plot and boxplot for each gene. for each gene in list, copy genes column into new col, plot histogram, plot scatter plot, plot boxplot, call function to dat_all and specify genes (my_genes) 
 
 make_gene_plots <- function(df, genes) {
 
@@ -188,11 +190,25 @@ make_gene_plots <- function(df, genes) {
            x = paste(g, "Expression Level"),
            y = "Number of samples"))
     # Scatterplot: vitamin D vs expression
+    print(ggplot(df, aes(x = mat_vitD, y = expression)) +
+      geom_point(alpha = 0.7, size = 2, color = "#A888B5") +
+      labs(title = str_wrap(paste(g, "Expression vs. Maternal Vitamin D"), width = 40),
+           x = "Maternal vitamin D (25-hydroxyvitamin D, ng/mL)",
+           y = paste(g, "Expression Level")))
+
     # Boxplot: age group and preeclampsia status
+    print(ggplot(df, aes(x = age_group, y = expression, fill = preg_preeclampsia)) +
+      geom_boxplot() +
+      scale_fill_manual(values = c("#A888B5", "#EC5353"), name = "Pregnancy outcome") +
+      labs(title = str_wrap(paste(g, "Expression by Age Group and Preeclampsia Status"),
+                            width = 40),
+           x = "Maternal age group (years)",
+           y = paste(g, "Expression Level")))
     
   }
   
 }
 
-
+# call it
+make_gene_plots(dat_all, my_genes)
 ```
