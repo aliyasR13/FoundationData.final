@@ -173,10 +173,24 @@ dat_all <- genes_wide %>%
 ##nrow(dat_all)
 ##names(dat_all)
 
+#make theme for plots based on prof.comment in submission 1 (added more x/y ticks in histogram and scatter plot)
+  legible_theme <- theme_minimal(base_size = 14) +
+    theme(
+      plot.title   = element_text(size = 16, face = "bold"),
+      axis.title   = element_text(size = 14),
+      axis.text    = element_text(size = 12),
+      legend.title = element_text(size = 13),
+      legend.text  = element_text(size = 12),
+    )
+
+
+
 #making function:
 # wants function to make histogram, scatter plot and boxplot for each gene. for each gene in list, copy genes column into new col, plot histogram, plot scatter plot, plot boxplot, call function to dat_all and specify genes (my_genes) 
 
+
 make_gene_plots <- function(df, genes) {
+  
 
   for (g in genes) {
 
@@ -188,13 +202,20 @@ make_gene_plots <- function(df, genes) {
       geom_histogram(bins = 20, fill = "#A888B5", color = "white") +
       labs(title = paste(g, "Expression Distribution"),
            x = paste(g, "Expression Level"),
-           y = "Number of samples"))
+           y = "Number of samples")+
+        scale_x_continuous(n.breaks = 10) +
+        scale_y_continuous(n.breaks = 10) +
+        legible_theme)
+   
     # Scatterplot: vitamin D vs expression
     print(ggplot(df, aes(x = mat_vitD, y = expression)) +
       geom_point(alpha = 0.7, size = 2, color = "#A888B5") +
       labs(title = str_wrap(paste(g, "Expression vs. Maternal Vitamin D"), width = 40),
            x = "Maternal vitamin D (25-hydroxyvitamin D, ng/mL)",
-           y = paste(g, "Expression Level")))
+           y = paste(g, "Expression Level"))+
+        scale_x_continuous(n.breaks = 10) +
+        scale_y_continuous(n.breaks = 10) +
+        legible_theme)
 
     # Boxplot: age group and preeclampsia status
     print(ggplot(df, aes(x = age_group, y = expression, fill = preg_preeclampsia)) +
@@ -203,7 +224,11 @@ make_gene_plots <- function(df, genes) {
       labs(title = str_wrap(paste(g, "Expression by Age Group and Preeclampsia Status"),
                             width = 40),
            x = "Maternal age group (years)",
-           y = paste(g, "Expression Level")))
+           y = paste(g, "Expression Level"))+
+        # tried to do geom_jitter but it didn't look right, so i had to look up an alternative
+       geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+             size = 1.5, alpha = 0.7, show.legend = FALSE)+
+        legible_theme)
     
   }
   
@@ -211,4 +236,6 @@ make_gene_plots <- function(df, genes) {
 
 # call it
 make_gene_plots(dat_all, my_genes)
+
+#used AI and google to look specific things up that I forgot or to debugg.
 ```
