@@ -210,7 +210,7 @@ make_gene_plots <- function(df, genes) {
     # Scatterplot: vitamin D vs expression
     print(ggplot(df, aes(x = mat_vitD, y = expression)) +
       geom_point(alpha = 0.7, size = 2, color = "#A888B5") +
-      labs(title = str_wrap(paste(g, "Expression vs. Maternal Vitamin D"), width = 40),
+      labs(title = str_wrap(paste(g, "Expression vs. Maternal VitaminD"), width = 40),
            x = "Maternal vitamin D (25-hydroxyvitamin D, ng/mL)",
            y = paste(g, "Expression Level"))+
         scale_x_continuous(n.breaks = 10) +
@@ -238,4 +238,190 @@ make_gene_plots <- function(df, genes) {
 make_gene_plots(dat_all, my_genes)
 
 #used AI and google to look specific things up that I forgot or to debugg.
+```
+
+```{r}
+#Submission 3--> summary statistics table
+#install.packages("tableone")
+library(tableone)
+
+#Create a table one looking at Maternal Vit.D, BMI, Gestational age (continuous)
+#Preeclampsia status and Maternal age group (categorical)
+
+#only want to select variables and make the labels readaale
+table_1 <- clean_covar %>%
+  select(preg_preeclampsia, mat_vitD, mat_BMI, delivery_gestAge_wks,
+         age_group) %>%
+  rename(`Maternal vitamin D (ng/mL)`             = mat_vitD,
+         `Maternal BMI (kg/m2)`                   = mat_BMI,
+         `Gestational age at delivery (weeks)`    = delivery_gestAge_wks,
+         `Maternal age group (years)`             = age_group)
+
+#every column except the grouping variable
+vars_all <- table_1 %>% select(-preg_preeclampsia) %>% names()
+
+tab1 <- CreateTableOne(vars = vars_all,
+                       strata = "preg_preeclampsia",
+                       data = table_1,
+                       factorVars = "Maternal age group (years)")
+
+tab1
+#use Tables generator link from class to turn into LaTex form
+#Used suggested table one package from class
+
+```
+
+```{r}
+#Making Heat map. Select 10 genes: FIG4, CNR1, BRDT, CA3, SIRT3, JAK2, LHB, TMEM176B, UTS2, CLIC2
+
+heat_genes <- c("FIG4","CNR1","BRDT","CA3","SIRT3","JAK2","LHB","TMEM176B","UTS2", "CLIC2")
+
+library(pheatmap)
+
+#filter only the 10 genes I want from the expression table
+#calculate variance for each row
+heat_df <- expr_named %>%
+  filter(GENE %in% heat_genes) %>%
+  mutate(row_var = apply(as.matrix(across(all_of(clean_covar$geoID))), 1, var)) %>%
+  group_by(GENE) %>%
+  slice(match(heat_genes, GENE))
+
+#from what I understand heat map needs a matrix so convert dataset to matrix and have gene names as row
+heat_mat <- as.matrix(heat_df[, clean_covar$geoID])
+rownames(heat_mat) <- heat_df$GENE
+
+#Checking dimensions
+#dim(heat_mat)                
+
+#Need annotation bars above the heatmap so specify and specify the colors to use
+annot_col <- data.frame(Outcome   = clean_covar$preg_preeclampsia,
+                        Age_group = clean_covar$age_group,
+                        row.names = clean_covar$geoID)
+
+annot_colors <- list(
+  Outcome   = c("Normal" = "#A888B5", "Preeclampsia" = "#EC5353"),
+  Age_group = c("<25" = "#E69F00", "25-29" = "#56B4E9", "30+" = "#009E73")
+)
+
+#Create a function so to create the heatmap, clustering has to be complete (linking for hierarchial clustering)
+draw_heatmap <- function(mat, annot, annot_cols) {
+  pheatmap(heat_mat,
+           scale = "row",                  
+           clustering_method = "complete",
+           annotation_col = annot_col,
+           annotation_colors = annot_colors,
+           show_colnames = FALSE,         
+           fontsize_row = 11,
+           main = "Expression of 10 selected genes",
+           filename= "heatmap.png")
+}
+
+draw_heatmap(mat, annot, annot_cols)
+
+#had to look up how to save a pheatmap so added filename after. 
+
+```
+
+```{r}
+# ridgeline plot aka joyplot which shows overall distribution 
+#install.packages("ggridges")
+library(ggridges)
+
+#pivot longer to turn the three gene columns into two columns
+#Looked up format and modified to my own data, inputs
+#aes: one ridge per gene, fill = two overlapping curves per gene, alpha = make transparent so overlap is visible 
+
+p_ridge <- dat_all %>%
+  pivot_longer(all_of(my_genes), names_to = "gene", values_to = "expression") %>%
+  ggplot(aes(x = expression, y = gene, fill = preg_preeclampsia)) +
+  geom_density_ridges(alpha = 0.7, scale = 0.9) +
+  scale_fill_manual(values = pe_colors, name = "Pregnancy outcome") +
+  labs(title = "Gene Expression by Preeclampsia Status",
+       x = "Expression level", y = NULL) +
+  legible_theme
+
+p_ridge
+ggsave("ridges.png", width = 8, height = 5, dpi = 300)
+```
+
+```{r}
+#organizing graphs for paper, had to look up how to display ggplot graphs in one go, also had to look up how to insert the a/b/c
+
+#install.packages("patchwork")
+library(patchwork)
+
+#Use lapply to build one plot per gene and store them in list (instead of printing above)
+#Use patchwork to combine each list into one figure
+#Each function has to copy the genes column and turn into generic expression column so that the same ggplot code could work for every gene
+
+#histogram
+
+hist_plots <- lapply(my_genes, function(g) {
+  df <- dat_all
+  df$expression <- df[[g]]
+
+  ggplot(df, aes(x = expression)) +
+    geom_histogram(bins = 20, fill = "#A888B5", color = "white") +
+    labs(title = paste(g, "Expression Distribution"),
+         x = paste(g, "Expression Level"),
+         y = "Number of samples") +
+    scale_x_continuous(n.breaks = 10) +
+    scale_y_continuous(n.breaks = 10) +
+    legible_theme
+})
+#scatterplot: gene expression vs maternal vitamin D
+#titles were long so I had to look up how to fix that and found str_wrap which splits long titles into two lines so they dont get cut off
+scatter_plots <- lapply(my_genes, function(g) {
+  df <- dat_all
+  df$expression <- df[[g]]
+
+  ggplot(df, aes(x = mat_vitD, y = expression)) +
+    geom_point(alpha = 0.7, size = 2, color = "#A888B5") +
+    labs(title = str_wrap(paste(g, "Expression vs. Maternal VitaminD"), width = 40),
+         x = "Maternal vitamin D (25-hydroxyvitamin D, ng/mL)",
+         y = paste(g, "Expression Level")) +
+    scale_x_continuous(n.breaks = 10) +
+    scale_y_continuous(n.breaks = 10) +
+    legible_theme
+})
+
+#Boxplot: 
+box_plots <- lapply(my_genes, function(g) {
+  df <- dat_all
+  df$expression <- df[[g]]
+
+  ggplot(df, aes(x = age_group, y = expression, fill = preg_preeclampsia)) +
+    geom_boxplot() +
+    scale_fill_manual(values = c("#A888B5", "#EC5353"), name = "Pregnancy outcome") +
+    labs(title = str_wrap(paste(g, "Expression by Age Group and Preeclampsia Status"),
+                          width = 40),
+         x = "Maternal age group (years)",
+         y = paste(g, "Expression Level")) +
+    geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+               size = 1.5, alpha = 0.7, show.legend = FALSE) +
+    legible_theme
+})
+
+# I want 3 figures, 3 panels each, with a, b, c labels
+#Looks squished, so had to look up a way to fix, tested with ggsave and specified height, width and dpi which worked out even though it still looks squished here.
+
+wrap_plots(hist_plots, ncol = 3) + plot_annotation(tag_levels = "a")
+ggsave("figure_hist.png", width = 18, height = 6, dpi = 300)
+
+wrap_plots(scatter_plots, ncol = 3) + plot_annotation(tag_levels = "a")
+ggsave("figure_scatter.png", width = 18, height = 6, dpi = 300)
+
+wrap_plots(box_plots, ncol = 3) + plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = "a")
+ggsave("figure_box.png", width = 18, height = 6, dpi = 300)
+
+#Had to look up how to find citations for r and packages used
+R.version.string       
+citation()  
+
+citation("ggplot2")
+citation("patchwork")
+citation("pheatmap")
+citation("ggridges")
+citation("tableone") 
 ```
